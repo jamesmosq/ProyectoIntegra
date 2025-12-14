@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir \"C:\\Users\\jmosquerarei\\PycharmProjects\\ProyectoIntegra\\*.pkl\")",
+      "Bash(.venv/Scripts/python:*)",
+      "Bash(.venv/Scripts/pip install:*)"
+    ]
+  }
+}
