@@ -6,9 +6,12 @@ Autor: James Mosquera Rentería
 """
 
 import streamlit as st
-import pandas as pd
-import numpy as np
-import joblib
+
+from predictor_logica import (
+    DatosEstudiante,
+    cargar_modelos,
+    ejecutar_prediccion_completa,
+)
 
 # Configuración de la página
 st.set_page_config(
@@ -24,15 +27,13 @@ st.markdown("---")
 # Cargar modelo y scaler
 @st.cache_resource
 def cargar_modelo():
-    modelo = joblib.load('modelo_desercion_final.pkl')
-    scaler = joblib.load('scaler_desercion.pkl')
-    return modelo, scaler
+    return cargar_modelos()
 
 try:
     modelo, scaler = cargar_modelo()
     st.success("Modelo cargado exitosamente")
-except:
-    st.error("Error al cargar el modelo. Asegúrese de ejecutar primero el notebook.")
+except Exception as e:
+    st.error(f"Error al cargar el modelo: {e}. Asegúrese de ejecutar primero el notebook.")
     st.stop()
 
 # Sidebar con información
@@ -81,24 +82,23 @@ st.markdown("---")
 
 # Botón de predicción
 if st.button("Realizar predicción", type="primary"):
-    # Crear vector de características (simplificado para demo)
-    datos_estudiante = np.zeros(36)
+    datos = DatosEstudiante(
+        edad=edad,
+        genero=genero,
+        estado_civil=estado_civil,
+        becario=becario,
+        deudor=deudor,
+        matricula_dia=matricula_dia,
+        materias_aprobadas_s1=materias_aprobadas_s1,
+        promedio_s1=promedio_s1,
+        nota_admision=nota_admision,
+    )
 
-    # Asignar valores conocidos
-    datos_estudiante[0] = estado_civil
-    datos_estudiante[17] = genero
-    datos_estudiante[18] = becario
-    datos_estudiante[19] = edad
-    datos_estudiante[15] = deudor
-    datos_estudiante[16] = matricula_dia
-    datos_estudiante[12] = nota_admision
-    datos_estudiante[24] = materias_aprobadas_s1
-    datos_estudiante[25] = promedio_s1
-
-    # Escalar y predecir
-    datos_scaled = scaler.transform([datos_estudiante])
-    prediccion = modelo.predict(datos_scaled)[0]
-    probabilidad = modelo.predict_proba(datos_scaled)[0]
+    try:
+        resultado = ejecutar_prediccion_completa(datos, modelo, scaler)
+    except ValueError as err:
+        st.error(f"Datos inválidos: {err}")
+        st.stop()
 
     # Mostrar resultado
     st.header("Resultado de la predicción")
@@ -106,30 +106,20 @@ if st.button("Realizar predicción", type="primary"):
     col_res1, col_res2 = st.columns(2)
 
     with col_res1:
-        if prediccion == 1:
+        if resultado.es_alto_riesgo:
             st.error("ALTO RIESGO DE DESERCIÓN")
-            st.metric("Probabilidad de deserción", f"{probabilidad[1]*100:.1f}%")
+            st.metric("Probabilidad de deserción",
+                      f"{resultado.probabilidad_desercion * 100:.1f}%")
         else:
             st.success("BAJO RIESGO DE DESERCIÓN")
-            st.metric("Probabilidad de permanencia", f"{probabilidad[0]*100:.1f}%")
+            st.metric("Probabilidad de permanencia",
+                      f"{resultado.probabilidad_permanencia * 100:.1f}%")
 
     with col_res2:
         st.subheader("Recomendaciones")
-        if prediccion == 1:
-            st.markdown("""
-            **Acciones sugeridas:**
-            - Asignar tutor académico
-            - Evaluar apoyo financiero
-            - Incluir en programa de mentoría
-            - Realizar seguimiento semanal
-            """)
-        else:
-            st.markdown("""
-            **Acciones sugeridas:**
-            - Mantener monitoreo regular
-            - Ofrecer oportunidades de liderazgo
-            - Incluir en estadísticas de éxito
-            """)
+        st.markdown("**Acciones sugeridas:**")
+        for accion in resultado.recomendaciones:
+            st.markdown(f"- {accion}")
 
 # Footer
 st.markdown("---")
